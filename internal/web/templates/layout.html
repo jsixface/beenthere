@@ -1,0 +1,53 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Beenthere</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--text:#1c2330;--muted:#677084;--line:#dfe3ea;--accent:#4f46e5;--accent-text:#fff;--danger:#c0362c}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--panel:#181c25;--text:#e7eaf0;--muted:#98a1b3;--line:#2a3040;--accent:#7c83ff;--accent-text:#0f1218;--danger:#ff7a70}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent)}
+nav{display:flex;gap:4px;align-items:center;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+nav .brand{font-weight:700;margin-right:12px;color:var(--text);text-decoration:none}
+nav a.link{padding:6px 10px;border-radius:6px;color:var(--muted);text-decoration:none}
+nav a.link.on,nav a.link:hover{background:var(--bg);color:var(--text)}
+nav form{margin-left:auto}
+main{max-width:1000px;margin:0 auto;padding:20px 16px}
+main.full{max-width:none;padding:0}
+h1{font-size:22px;margin:0 0 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+button,.btn{background:var(--accent);color:var(--accent-text);border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer;text-decoration:none;display:inline-block}
+button.secondary,.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.danger{background:var(--danger);color:#fff}
+input,select,textarea{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
+label{display:block;color:var(--muted);font-size:13px;margin:10px 0 4px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:13px}
+.err{color:var(--danger);margin:8px 0}.muted{color:var(--muted)}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.stat{font-size:26px;font-weight:700}.stat small{display:block;font-size:13px;font-weight:400;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+</style>
+</head>
+<body>
+{{if .User}}
+<nav>
+  <a class="brand" href="/map">Beenthere</a>
+  {{range $p := (navItems)}}<a class="link {{if eq $.Active $p.Key}}on{{end}}" href="{{$p.Path}}">{{$p.Label}}</a>{{end}}
+  <form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
+</nav>
+<script>window.BT={apiKey:{{.User.APIKey}},tz:{{.User.Timezone}},email:{{.User.Email}}};
+window.api=async(path,opts={})=>{const r=await fetch('/api/v1'+path,{...opts,headers:{'Authorization':'Bearer '+BT.apiKey,...(opts.body&&!(opts.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...(opts.headers||{})}});
+if(!r.ok&&r.status!==204){let m=r.statusText;try{const j=await r.json();m=j.error||(j.errors||[]).join(', ')||m}catch(e){}throw new Error(m)}
+return r.status===204?null:r};
+window.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+</script>
+{{end}}
+{{template "content" .}}
+</body>
+</html>{{end}}

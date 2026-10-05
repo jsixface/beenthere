@@ -1,0 +1,31 @@
+{{define "content"}}
+<main>
+<h1>Trips</h1>
+<form class="card row" id="new">
+  <div><label>Name</label><input name="name" required></div>
+  <div><label>Start</label><input name="started_at" type="date" required></div>
+  <div><label>End</label><input name="ended_at" type="date" required></div>
+  <div><label>Description</label><input name="description"></div>
+  <button type="submit">Create trip</button>
+</form>
+<div id="err" class="err"></div>
+<div class="card"><table><thead><tr><th>Name</th><th>Dates</th><th>Distance</th><th>Points</th><th>Countries</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function load(){
+  const t=await (await api('/trips')).json();
+  $('rows').innerHTML=t.map(x=>`<tr><td><b>${esc(x.name)}</b><div class="muted">${esc(x.description)}</div></td>
+   <td>${new Date(x.started_at).toLocaleDateString()} – ${new Date(x.ended_at).toLocaleDateString()}</td>
+   <td>${x.distance!=null?(x.distance/1000).toFixed(1)+' km':'–'}</td><td>${x.points_count}</td>
+   <td>${esc((x.visited_countries||[]).join(', '))}</td>
+   <td><button class="secondary" data-r="${x.id}">Recalculate</button> <button class="danger" data-d="${x.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan=6 class="muted">No trips yet.</td></tr>';
+}
+$('new').onsubmit=async e=>{e.preventDefault();$('err').textContent='';const f=Object.fromEntries(new FormData(e.target));
+  try{await api('/trips',{method:'POST',body:JSON.stringify({trip:{...f,started_at:f.started_at+'T00:00:00Z',ended_at:f.ended_at+'T23:59:59Z'}})});e.target.reset();load()}catch(x){$('err').textContent=x.message}};
+$('rows').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.d&&confirm('Delete this trip?')){await api('/trips/'+b.dataset.d,{method:'DELETE'});load()}
+  if(b.dataset.r){await api('/trips/'+b.dataset.r+'/recalculate',{method:'POST'});load()}};
+load().catch(e=>$('err').textContent=e.message);
+</script>
+{{end}}

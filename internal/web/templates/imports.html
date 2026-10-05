@@ -1,0 +1,29 @@
+{{define "content"}}
+<main>
+<h1>Imports</h1>
+<form class="card" id="up">
+  <p class="muted" style="margin-top:0">GPX, KML, GeoJSON, OwnTracks .rec, and Google Records.json / Timeline exports. Large files are streamed and processed in the background.</p>
+  <div class="row">
+    <div><label>Files</label><input type="file" name="files" multiple required></div>
+    <div><label>Format</label><select name="source"><option value="">Auto-detect</option><option value="gpx">GPX</option><option value="kml">KML</option><option value="geojson">GeoJSON</option><option value="owntracks">OwnTracks</option><option value="google_records">Google Records</option><option value="google_phone_takeout">Google phone Timeline</option></select></div>
+    <button type="submit">Upload</button>
+  </div>
+  <div id="msg" class="muted" style="margin-top:8px"></div>
+</form>
+<div class="card"><table><thead><tr><th>Name</th><th>Source</th><th>Status</th><th>Points</th><th>Duplicates</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);let timer;
+async function load(){
+  const l=await (await api('/imports?per_page=50')).json();
+  $('rows').innerHTML=l.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.source)}</td><td>${i.status}${i.error_message?`<div class="err">${esc(i.error_message)}</div>`:''}</td><td>${i.processed.toLocaleString()} / ${i.raw_points.toLocaleString()}</td><td>${i.doubles}</td><td><button class="danger" data-d="${i.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan=6 class="muted">No imports yet.</td></tr>';
+  clearTimeout(timer);if(l.some(i=>i.status==='created'||i.status==='processing'))timer=setTimeout(load,2000);
+}
+$('up').onsubmit=async e=>{e.preventDefault();$('msg').textContent='Uploading…';
+  const fd=new FormData();const src=e.target.source.value;if(src)fd.append('source',src);
+  for(const f of e.target.files.files)fd.append('files',f);
+  try{await api('/imports',{method:'POST',body:fd});$('msg').textContent='Queued.';e.target.reset();load()}catch(x){$('msg').textContent=x.message}};
+$('rows').onclick=async e=>{const b=e.target.closest('button[data-d]');if(!b||!confirm('Delete this import and its points?'))return;await api('/imports/'+b.dataset.d,{method:'DELETE'});load()};
+load().catch(e=>$('msg').textContent=e.message);
+</script>
+{{end}}

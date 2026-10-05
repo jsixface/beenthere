@@ -1,0 +1,35 @@
+{{define "content"}}
+<main>
+<h1>Places & areas</h1>
+<form class="card row" id="np">
+  <div><label>Name</label><input name="name" required></div>
+  <div><label>Latitude</label><input name="latitude" required inputmode="decimal"></div>
+  <div><label>Longitude</label><input name="longitude" required inputmode="decimal"></div>
+  <button type="submit">Add place</button>
+</form>
+<div id="err" class="err"></div>
+<div class="card"><h2 style="margin-top:0">Places</h2><table><thead><tr><th>Name</th><th>Location</th><th>Visits</th><th>Tags</th><th></th></tr></thead><tbody id="places"></tbody></table></div>
+<form class="card row" id="na">
+  <div><label>Area name</label><input name="name" required></div>
+  <div><label>Latitude</label><input name="latitude" required inputmode="decimal"></div>
+  <div><label>Longitude</label><input name="longitude" required inputmode="decimal"></div>
+  <div><label>Radius (m)</label><input name="radius" required inputmode="numeric" value="100"></div>
+  <button type="submit">Add area</button>
+</form>
+<div class="card"><h2 style="margin-top:0">Areas</h2><table><thead><tr><th>Name</th><th>Location</th><th>Radius</th><th></th></tr></thead><tbody id="areas"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function load(){
+  const [p,a]=await Promise.all([api('/places?filter=all').then(r=>r.json()),api('/areas').then(r=>r.json())]);
+  $('places').innerHTML=p.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.latitude.toFixed(5)}, ${x.longitude.toFixed(5)}</td><td>${x.visits_count}</td><td>${x.tags.map(t=>esc(t.name)).join(', ')}</td><td><button class="danger" data-p="${x.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan=5 class="muted">None yet.</td></tr>';
+  $('areas').innerHTML=a.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.latitude.toFixed(5)}, ${x.longitude.toFixed(5)}</td><td>${x.radius} m</td><td><button class="danger" data-a="${x.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan=4 class="muted">None yet.</td></tr>';
+}
+const submit=(id,path,key)=>$(id).onsubmit=async e=>{e.preventDefault();$('err').textContent='';
+  try{await api(path,{method:'POST',body:JSON.stringify({[key]:Object.fromEntries(new FormData(e.target))})});e.target.reset();load()}catch(x){$('err').textContent=x.message}};
+submit('np','/places','place');submit('na','/areas','area');
+document.body.onclick=async e=>{const b=e.target.closest('button[data-p],button[data-a]');if(!b||!confirm('Delete?'))return;
+  await api(b.dataset.p?'/places/'+b.dataset.p:'/areas/'+b.dataset.a,{method:'DELETE'});load()};
+load().catch(e=>$('err').textContent=e.message);
+</script>
+{{end}}

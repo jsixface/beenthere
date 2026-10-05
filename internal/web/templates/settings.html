@@ -1,0 +1,30 @@
+{{define "content"}}
+<main>
+<h1>Settings</h1>
+<div class="card">
+  <h2 style="margin-top:0">Your API key</h2>
+  <p class="muted">Use it in tracking apps as <code>?api_key=…</code> or an <code>Authorization: Bearer</code> header.</p>
+  <input id="key" readonly value="{{.User.APIKey}}" style="width:100%;font-family:monospace">
+  <h3>Endpoints</h3>
+  <ul class="muted"><li>Dawarich app / native: <code>POST /api/v1/points</code></li><li>Overland: <code>POST /api/v1/overland/batches</code></li><li>OwnTracks (HTTP mode): <code>POST /api/v1/owntracks/points</code></li><li>Traccar: <code>POST /api/v1/traccar/points</code></li></ul>
+</div>
+<form class="card" id="f">
+  <h2 style="margin-top:0">Preferences</h2>
+  <div class="grid">
+    <div><label>Timezone</label><input name="timezone"></div>
+    <div><label>Minutes between routes</label><input name="minutes_between_routes" inputmode="numeric"></div>
+    <div><label>Meters between routes</label><input name="meters_between_routes" inputmode="numeric"></div>
+    <div><label>Min. minutes spent in a city</label><input name="min_minutes_spent_in_city" inputmode="numeric"></div>
+    <div><label>Visit radius (m)</label><input name="visit_radius_meters" inputmode="numeric"></div>
+    <div><label>Visit min. duration (min)</label><input name="visit_min_duration_minutes" inputmode="numeric"></div>
+  </div>
+  <p><button type="submit">Save</button> <span id="msg" class="muted"></span></p>
+</form>
+</main>
+<script>
+const $=id=>document.getElementById(id);const f=$('f');
+(async()=>{const s=(await (await api('/settings')).json()).settings;for(const el of f.elements)if(el.name&&s[el.name]!=null)el.value=s[el.name]})();
+f.onsubmit=async e=>{e.preventDefault();const v=Object.fromEntries(new FormData(f));
+  try{await api('/settings',{method:'PATCH',body:JSON.stringify({settings:v})});$('msg').textContent='Saved.'}catch(x){$('msg').textContent=x.message}};
+</script>
+{{end}}

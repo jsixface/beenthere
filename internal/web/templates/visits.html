@@ -1,0 +1,26 @@
+{{define "content"}}
+<main>
+<h1>Visits</h1>
+<div class="card row">
+  <div><label for="from">From</label><input id="from" type="date"></div>
+  <div><label for="to">To</label><input id="to" type="date"></div>
+  <div><label for="status">Status</label><select id="status"><option value="">All</option><option>suggested</option><option>confirmed</option></select></div>
+  <button id="go">Load</button>
+</div>
+<div class="card"><table><thead><tr><th>Name</th><th>Start</th><th>Duration</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const iso=d=>d.toISOString().slice(0,10);
+const t=new Date(),s=new Date();s.setDate(s.getDate()-30);$('from').value=iso(s);$('to').value=iso(t);
+async function load(){
+  const qs=new URLSearchParams({start_at:$('from').value+'T00:00:00Z',end_at:$('to').value+'T23:59:59Z'});if($('status').value)qs.set('status',$('status').value);
+  const v=await (await api('/visits?'+qs)).json();
+  $('rows').innerHTML=v.map(x=>`<tr><td>${esc(x.name)}</td><td>${new Date(x.started_at).toLocaleString()}</td><td>${x.duration} min</td><td>${x.status}</td>
+   <td>${x.status==='suggested'?`<button data-a="confirmed" data-id="${x.id}">Confirm</button> <button class="secondary" data-a="declined" data-id="${x.id}">Decline</button>`:''}</td></tr>`).join('')||'<tr><td colspan=5 class="muted">No visits in this range.</td></tr>';
+}
+$('rows').onclick=async e=>{const b=e.target.closest('button[data-id]');if(!b)return;
+  await api('/visits/'+b.dataset.id,{method:'PATCH',body:JSON.stringify({visit:{status:b.dataset.a}})});load()};
+$('go').onclick=load;load().catch(e=>$('rows').innerHTML=`<tr><td class="err">${esc(e.message)}</td></tr>`);
+</script>
+{{end}}

@@ -1,0 +1,73 @@
+{{define "content"}}
+<style>
+#wrap{position:relative;height:calc(100vh - 53px)}#map{position:absolute;inset:0}
+#panel{position:absolute;top:12px;left:12px;z-index:2;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;width:260px;max-width:calc(100vw - 24px)}
+#panel label{margin:6px 0 2px}#panel input[type=date]{width:100%}
+#panel .chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:6px 0}
+#panel .chk input{width:auto}#status{margin-top:8px;font-size:13px;color:var(--muted)}
+</style>
+<main class="full">
+<div id="wrap">
+  <div id="map"></div>
+  <div id="panel">
+    <div class="row"><div><label for="from">From</label><input id="from" type="date"></div><div><label for="to">To</label><input id="to" type="date"></div></div>
+    <div class="row" style="margin-top:8px"><button id="apply" type="button">Apply</button><button class="secondary" id="week" type="button">7 days</button><button class="secondary" id="month" type="button">30 days</button></div>
+    <label class="chk"><input type="checkbox" id="l-heat" checked> Heatmap</label>
+    <label class="chk"><input type="checkbox" id="l-tracks" checked> Tracks</label>
+    <label class="chk"><input type="checkbox" id="l-points"> Points</label>
+    <div id="status"></div>
+  </div>
+</div>
+</main>
+<link rel="stylesheet" href="/static/maplibre/maplibre-gl.css">
+<script type="module">
+import {Map as MLMap, NavigationControl, Popup, ScaleControl} from '/static/maplibre/maplibre-gl.mjs';
+const $=id=>document.getElementById(id);
+const iso=d=>d.toISOString().slice(0,10);
+const today=new Date();
+$('to').value=iso(today);const f=new Date(today);f.setDate(f.getDate()-7);$('from').value=iso(f);
+const range=()=>({s:Math.floor(new Date($('from').value+'T00:00:00').getTime()/1000),e:Math.floor(new Date($('to').value+'T23:59:59').getTime()/1000)});
+const map=new MLMap({container:'map',center:[10,30],zoom:2,
+  style:{version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]},
+  transformRequest:(url)=>url.includes('/api/v1/tiles/')?{url,headers:{Authorization:'Bearer '+BT.apiKey}}:undefined});
+map.addControl(new NavigationControl(),'top-right');map.addControl(new ScaleControl());
+const q=()=>{const r=range();return `start_at=${r.s}&end_at=${r.e}`};
+const origin=location.origin;
+function setup(){
+  const pq=q();
+  for(const id of ['pts','trk']){if(map.getLayer(id+'-heat'))map.removeLayer(id+'-heat');}
+  ['heat','points','tracks'].forEach(l=>{if(map.getLayer(l))map.removeLayer(l)});
+  ['points','tracks'].forEach(s=>{if(map.getSource(s))map.removeSource(s)});
+  map.addSource('points',{type:'vector',tiles:[`${origin}/api/v1/tiles/points/{z}/{x}/{y}.mvt?${pq}`],maxzoom:14});
+  map.addSource('tracks',{type:'vector',tiles:[`${origin}/api/v1/tiles/tracks/{z}/{x}/{y}.mvt?${pq}`],maxzoom:14});
+  map.addLayer({id:'heat',type:'heatmap',source:'points','source-layer':'points',paint:{'heatmap-radius':14,'heatmap-intensity':0.8,'heatmap-weight':['min',['get','count'],20]}});
+  map.addLayer({id:'tracks',type:'line',source:'tracks','source-layer':'tracks',paint:{'line-color':'#6366F1','line-width':3,'line-opacity':0.85},layout:{'line-cap':'round','line-join':'round'}});
+  map.addLayer({id:'points',type:'circle',source:'points','source-layer':'points',minzoom:10,paint:{'circle-radius':4,'circle-color':'#ef4444','circle-stroke-width':1,'circle-stroke-color':'#fff'}});
+  vis();
+}
+function vis(){
+  map.setLayoutProperty('heat','visibility',$('l-heat').checked?'visible':'none');
+  map.setLayoutProperty('tracks','visibility',$('l-tracks').checked?'visible':'none');
+  map.setLayoutProperty('points','visibility',$('l-points').checked?'visible':'none');
+}
+async function fit(){
+  $('status').textContent='Loading…';
+  try{
+    const r=await api(`/tracks?${q()}&per_page=1000`);const j=await r.json();
+    let b=null;
+    for(const f of j.features){const cs=f.geometry?.coordinates||[];for(const c of cs){b=b?[Math.min(b[0],c[0]),Math.min(b[1],c[1]),Math.max(b[2],c[0]),Math.max(b[3],c[1])]:[c[0],c[1],c[0],c[1]]}}
+    if(b)map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:60,maxZoom:15,duration:0});
+    $('status').textContent=`${j.features.length} tracks`;
+  }catch(e){$('status').textContent=e.message}
+}
+map.on('load',()=>{setup();fit()});
+$('apply').onclick=()=>{setup();fit()};
+$('week').onclick=()=>{const t=new Date(),s=new Date();s.setDate(s.getDate()-7);$('from').value=iso(s);$('to').value=iso(t);setup();fit()};
+$('month').onclick=()=>{const t=new Date(),s=new Date();s.setDate(s.getDate()-30);$('from').value=iso(s);$('to').value=iso(t);setup();fit()};
+['l-heat','l-tracks','l-points'].forEach(id=>$(id).onchange=vis);
+map.on('click','points',e=>{const p=e.features[0].properties;if(p.count>1)return;
+  new Popup().setLngLat(e.lngLat).setHTML(`<div style="color:#111">${p.timestamp?new Date(p.timestamp*1000).toLocaleString():''}<br>${p.altitude!=null?'Alt '+p.altitude+' m<br>':''}${p.velocity?'Speed '+p.velocity+' m/s':''}</div>`).addTo(map)});
+map.on('click','tracks',e=>{const p=e.features[0].properties;
+  new Popup().setLngLat(e.lngLat).setHTML(`<div style="color:#111">${(p.distance/1000).toFixed(1)} km · ${Math.round(p.duration/60)} min</div>`).addTo(map)});
+</script>
+{{end}}

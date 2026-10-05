@@ -1,0 +1,19 @@
+{{define "content"}}
+<main>
+<h1>Exports</h1>
+<form class="card row" id="ex">
+  <div><label>From</label><input type="date" name="from"></div>
+  <div><label>To</label><input type="date" name="to"></div>
+  <div><label>Format</label><select name="format"><option value="gpx">GPX</option><option value="geojson">GeoJSON</option></select></div>
+  <button type="submit">Download</button>
+</form>
+<p class="muted">Leave the dates empty to export everything. The file is streamed straight from the database.</p>
+<div id="err" class="err"></div>
+</main>
+<script>
+document.getElementById('ex').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
+  const qs=new URLSearchParams({format:f.format});if(f.from)qs.set('start_at',f.from+'T00:00:00Z');if(f.to)qs.set('end_at',f.to+'T23:59:59Z');
+  try{const r=await api('/export?'+qs);const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);
+   a.download='export.'+(f.format==='gpx'?'gpx':'geojson');a.click();URL.revokeObjectURL(a.href)}catch(x){document.getElementById('err').textContent=x.message}};
+</script>
+{{end}}

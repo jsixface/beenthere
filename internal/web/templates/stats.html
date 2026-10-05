@@ -1,0 +1,18 @@
+{{define "content"}}
+<main>
+<h1>Stats</h1>
+<div class="grid" id="totals"></div>
+<div id="years"></div>
+</main>
+<script>
+(async()=>{
+const j=await (await api('/stats')).json();
+document.getElementById('totals').innerHTML=[['Distance',j.totalDistanceKm.toLocaleString()+' km'],['Points',j.totalPointsTracked.toLocaleString()],['Countries',j.totalCountriesVisited],['Cities',j.totalCitiesVisited]]
+ .map(([k,v])=>`<div class="card"><div class="stat">${v}<small>${k}</small></div></div>`).join('');
+document.getElementById('years').innerHTML=j.yearlyStats.map(y=>{
+ const max=Math.max(1,...Object.values(y.monthlyDistanceKm));
+ const bars=Object.entries(y.monthlyDistanceKm).map(([m,v])=>`<div title="${m}: ${v} km" style="flex:1;text-align:center"><div style="height:${Math.round(v/max*80)}px;background:var(--accent);border-radius:3px 3px 0 0;margin-top:${80-Math.round(v/max*80)}px"></div><small class="muted">${m.slice(0,1).toUpperCase()}</small></div>`).join('');
+ return `<div class="card"><h2 style="margin:0 0 4px">${y.year}</h2><div class="muted">${y.totalDistanceKm.toLocaleString()} km · ${y.totalCountriesVisited} countries · ${y.totalCitiesVisited} cities</div><div style="display:flex;gap:4px;margin-top:12px;height:110px">${bars}</div></div>`}).join('')||'<p class="muted">No stats yet. Stats appear after points are recorded or imported.</p>';
+})().catch(e=>document.getElementById('years').textContent=e.message);
+</script>
+{{end}}
