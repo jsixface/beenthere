@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/sixface/beenthere/internal/jobs"
+	"github.com/sixface/beenthere/internal/migrate"
 	"github.com/sixface/beenthere/internal/store"
 )
 
@@ -42,6 +43,9 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
+	if _, err := migrate.Apply(ctx, s.Pool); err != nil {
+		t.Fatal(err)
+	}
 	for _, tbl := range []string{"points", "visits", "place_visits", "taggings", "tags", "places", "areas", "notes", "action_text_rich_texts",
 		"planned_day_notes", "planned_stops", "planned_reservations", "planned_days", "planned_accommodations", "planned_travellers", "planned_unplanned_places", "trips", "track_segments", "tracks", "stats", "imports", "users"} {
 		if _, err := s.Pool.Exec(ctx, "DELETE FROM "+tbl); err != nil {

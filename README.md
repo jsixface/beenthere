@@ -28,6 +28,62 @@ Optional: `PHOTON_API_HOST` / `NOMINATIM_API_HOST` (+ `*_USE_HTTPS`, `REVERSE_GE
 (city names for stats). Nothing external is contacted unless you set one. `WORKERS`, `DB_POOL`, `MAX_UPLOAD_MB` tune
 resources.
 
+## Docker
+
+Images are published to `ghcr.io/jsixface/beenthere`: `testing` follows the `main` branch, and every git tag `vX.Y.Z`
+publishes `X.Y.Z` and `latest` (amd64 and arm64).
+
+```bash
+docker run -d --name beenthere -p 3000:3000 \
+  -e DATABASE_URL='postgres://user:pass@db-host:5432/beenthere?sslmode=disable' \
+  -e SECRET_KEY_BASE="$(openssl rand -hex 32)" \
+  ghcr.io/jsixface/beenthere:latest
+docker exec beenthere /beenthere adduser you@example.com --admin
+```
+
+### Docker Compose
+
+```yaml
+services:
+  db:
+    image: postgis/postgis:17-3.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: beenthere
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: beenthere
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beenthere"]
+      interval: 5s
+      retries: 10
+
+  app:
+    image: ghcr.io/jsixface/beenthere:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://beenthere:change-me@db:5432/beenthere?sslmode=disable
+      SECRET_KEY_BASE: replace-with-output-of-openssl-rand-hex-32
+      # Optional reverse geocoding (city names in stats):
+      # PHOTON_API_HOST: photon.example.com
+
+volumes:
+  db-data:
+```
+
+```bash
+docker compose up -d
+docker compose exec app /beenthere adduser you@example.com --admin   # prints a password and API key
+```
+
+The schema is created automatically on first start. Put a TLS-terminating reverse proxy in front for public use.
+
 ## What is ported
 
 | Area | Status |

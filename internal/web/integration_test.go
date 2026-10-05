@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/sixface/beenthere/internal/migrate"
 	"github.com/sixface/beenthere/internal/store"
 )
 
@@ -30,6 +31,9 @@ func TestLoginFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
+	if _, err := migrate.Apply(ctx, s.Pool); err != nil {
+		t.Fatal(err)
+	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct horse"), 4)
 	_, _ = s.Pool.Exec(ctx, `DELETE FROM users WHERE email='web@example.com'`)
 	if _, err := s.Pool.Exec(ctx, `INSERT INTO users (email, api_key, encrypted_password, status, created_at, updated_at) VALUES ('web@example.com','k',$1,1,now(),now())`, string(hash)); err != nil {
